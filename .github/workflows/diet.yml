@@ -1,0 +1,43 @@
+name: Copy File to Gist Daily
+
+on:
+  schedule:
+    # 毎日日本時間の午前9時（UTC 0:00）に実行
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 手動実行用
+
+jobs:
+  copy-to-gist:
+    runs-on: ubuntu-latest
+    steps:
+      # 最新のNode.jsに対応したv5に変更（これで警告が消えます）
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Read File and Update Gist
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: 'e161e9eab89c651b2f052d080131243d'
+          GIST_FILE_NAME: 'diet.txt'
+          SOURCE_FILE_PATH: 'diet.txt' # あなたの結果ファイル名
+        run: |
+          # 1. 念のためファイルが存在するかチェック
+          if [ ! -f "$SOURCE_FILE_PATH" ]; then
+            echo "Error: $SOURCE_FILE_PATH が見つかりません。"
+            exit 1
+          fi
+
+          # 2. 特殊文字や改行を一切気にせずプレーンテキストとして確実にJSON化
+          JSON_DATA=$(jq -n \
+            --arg filename "$GIST_FILE_NAME" \
+            --arg content "$(cat "$SOURCE_FILE_PATH")" \
+            '{files: {($filename): {content: $content}}}')
+
+          # 3. Gistへ送信
+          curl -L \
+            -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GIST_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://github.com \
+            -d "$JSON_DATA"
