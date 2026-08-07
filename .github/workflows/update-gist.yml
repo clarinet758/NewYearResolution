@@ -4,29 +4,36 @@ on:
   schedule:
     # 毎日日本時間の午前9時（UTC 0:00）に実行
     - cron: '0 0 * * *'
-  workflow_dispatch: # ボタンから手動で即時実行も可能
+  workflow_dispatch: # 手動実行用
 
 jobs:
   copy-to-gist:
     runs-on: ubuntu-latest
     steps:
+      # 最新のNode.jsに対応したv5に変更（これで警告が消えます）
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Read File and Update Gist
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
-          GIST_ID: 'e161e9eab89c651b2f052d080131243d'      # GistのURL末尾にある英数字
-          GIST_FILE_NAME: 'diet.txt'    # Gist側でのファイル名
-          SOURCE_FILE_PATH: 'diet.txt' # リポジトリ内にある結果ファイルのパス
+          GIST_ID: 'e161e9eab89c651b2f052d080131243d'
+          GIST_FILE_NAME: 'diet.txt'
+          SOURCE_FILE_PATH: 'diet.csv' # あなたの結果ファイル名
         run: |
-          # 結果ファイルの内容を読み込む（改行や特殊文字を安全に処理するためjqを使用）
+          # 1. 念のためファイルが存在するかチェック
+          if [ ! -f "$SOURCE_FILE_PATH" ]; then
+            echo "Error: $SOURCE_FILE_PATH が見つかりません。"
+            exit 1
+          fi
+
+          # 2. 特殊文字や改行を一切気にせずプレーンテキストとして確実にJSON化
           JSON_DATA=$(jq -n \
             --arg filename "$GIST_FILE_NAME" \
-            --arg content "$(cat $SOURCE_FILE_PATH)" \
+            --arg content "$(cat "$SOURCE_FILE_PATH")" \
             '{files: {($filename): {content: $content}}}')
 
-          # GitHub APIでGistの中身をそっくり入れ替える
+          # 3. Gistへ送信
           curl -L \
             -X PATCH \
             -H "Accept: application/vnd.github+json" \
