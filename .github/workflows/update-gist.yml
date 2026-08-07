@@ -1,0 +1,36 @@
+name: Copy File to Gist Daily
+
+on:
+  schedule:
+    # 毎日日本時間の午前9時（UTC 0:00）に実行
+    - cron: '0 0 * * *'
+  workflow_dispatch: # ボタンから手動で即時実行も可能
+
+jobs:
+  copy-to-gist:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read File and Update Gist
+        env:
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: 'e161e9eab89c651b2f052d080131243d'      # GistのURL末尾にある英数字
+          GIST_FILE_NAME: 'diet.txt'    # Gist側でのファイル名
+          SOURCE_FILE_PATH: 'diet.txt' # リポジトリ内にある結果ファイルのパス
+        run: |
+          # 結果ファイルの内容を読み込む（改行や特殊文字を安全に処理するためjqを使用）
+          JSON_DATA=$(jq -n \
+            --arg filename "$GIST_FILE_NAME" \
+            --arg content "$(cat $SOURCE_FILE_PATH)" \
+            '{files: {($filename): {content: $content}}}')
+
+          # GitHub APIでGistの中身をそっくり入れ替える
+          curl -L \
+            -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GIST_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://github.com \
+            -d "$JSON_DATA"
