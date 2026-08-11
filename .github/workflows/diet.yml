@@ -34,5 +34,3 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GIST_TOKEN" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://github.com \
-            -d "$JSON_DATA"
