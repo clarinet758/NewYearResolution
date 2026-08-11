@@ -1,0 +1,62 @@
+name: Sync Japanese Memo to Single Gist File
+
+on:
+  schedule:
+    # 毎日 日本時間(JST)の朝 09:00 に実行 (UTC 00:00)
+    - cron: '0 0 * * *'
+  # 手動でテスト実行できるようにボタンを追加
+  workflow_dispatch:
+
+jobs:
+  sync-gist:
+    runs-on: ubuntu-latest
+
+    # 環境変数の設定（ここを自身の環境に合わせて書き換えてください）
+    env:
+      MEMO_FILE_PATH: "diet.txt"                  # 同期元のリポジトリ内ファイルパス
+      GIST_ID: "e161e9eab89c651b2f052d080131243d"                # 同期先のGist ID（URL末尾の英数字）
+      GIST_FILENAME: "diet.txt"          # Gist側でのファイル名
+
+    steps:
+      # 1. リポジトリのチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. テキストファイルの存在チェックとエンコード処理
+      - name: Prepare file content
+        id: prepare_content
+        run: |
+          if [ ! -f "${{ env.MEMO_FILE_PATH }}" ]; then
+            echo "エラー: 指定されたファイル (${{ env.MEMO_FILE_PATH }}) が見つかりません。"
+            exit 1
+          fi
+
+          # 日本語の改行や特殊文字を崩さないよう、jqを使って安全にJSON化します
+          jq -Rs . "${{ env.MEMO_FILE_PATH }}" > content.json
+
+      # 3. Gist APIを叩いて単一ファイルを上書き更新
+      - name: Update Gist
+        env:
+          GH_TOKEN: ${{ secrets.GIST_PAT }}
+        run: |
+          # 送信用JSONボディの構築
+          cat <<EOF > payload.json
+          {
+            "files": {
+              "${{ env.GIST_FILENAME }}": {
+                "content": $(cat content.json)
+              }
+            }
+          }
+          EOF
+
+          # GitHub REST API を使用してGistをPATCH更新
+          curl -s -X PATCH \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/gists/${{ env.GIST_ID }}" \
+            -d @payload.json \
+            --fail-with-body
+
+          echo "Gistの更新が完了しました。"
