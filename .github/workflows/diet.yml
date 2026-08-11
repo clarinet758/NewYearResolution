@@ -15,7 +15,6 @@ jobs:
       - name: Read File and Update Gist
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
-          GIST_ID: 'e161e9eab89c651b2f052d080131243d'
           GIST_FILE_NAME: 'diet.txt'
           SOURCE_FILE_PATH: 'diet.txt'
         run: |
@@ -24,15 +23,11 @@ jobs:
             exit 1
           fi
 
+          # 1. データを安全にJSON化
           JSON_DATA=$(jq -n \
             --arg filename "$GIST_FILE_NAME" \
             --arg content "$(cat "$SOURCE_FILE_PATH")" \
             '{files: {($filename): {content: $content}}}')
 
-          # URLの変数展開をより確実にし、APIの成否をログで追えるようにします
-          curl -i -X PATCH \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: token $GIST_TOKEN" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://github.com{GIST_ID}" \
-            -d "$JSON_DATA"
+          # 2. URLに直接IDを書き込み、改行をなくして1行で確実に送信（Classicトークン用に Authorization も再修正）
+          curl -L -X PATCH -H "Accept: application/vnd.github+json" -H "Authorization: token $GIST_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" "https://github.com" -d "$JSON_DATA"
